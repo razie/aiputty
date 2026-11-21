@@ -6,7 +6,8 @@
 # Options:
 #   --doc <file>|-      the item's document (markdown); default none. Your person's words go under ## Prompt.
 #   --kind <kind>       e.g. bug, impl, issue, investigate, handover (default: d2's)
-#   --role <role>       forRole: the lane it goes to (default: your own role)
+#   --role <lane>       forRole, required: the lane it goes to, as your role skill's item_file says
+#                       (e.g. "designer agent", or a handover's "<your role> agent")
 #   --for <handle>      forName: a person's handle, never an agent's
 #   --size <size>       small | medium | large
 #   --touches <a,b>     what it touches (a coder ticket needs them)
@@ -24,7 +25,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 . "$here/lib.sh"
 
 usage() {
-  echo 'usage: file.sh [--dry] [--doc file|-] [--kind k] [--role r] [--for handle] [--size s] [--touches a,b]' >&2
+  echo 'usage: file.sh [--dry] --role <lane> [--doc file|-] [--kind k] [--for handle] [--size s] [--touches a,b]' >&2
   echo '               [--chat id] [--set key=value ...] "<title>" "<summary>"' >&2
   exit 2
 }
@@ -48,8 +49,7 @@ while [ $# -gt 0 ]; do
 done
 [ $# -eq 2 ] || usage
 d2_need python3 || exit 2
-[ -n "$frole" ] || frole=${D2_ROLE:-$(printf '%s' "${D2_AGENT:-}" | sed -E 's/-[0-9]+$//')}
-[ -n "$frole" ] || { echo "file.sh: say --role (no D2_ROLE or D2_AGENT to take it from)" >&2; exit 2; }
+[ -n "$frole" ] || { echo "file.sh: say --role <lane> (forRole: the lane it goes to)" >&2; exit 2; }
 
 tmp=$(d2_tmp)
 trap 'rm -rf "$tmp"' EXIT

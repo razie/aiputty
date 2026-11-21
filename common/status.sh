@@ -14,6 +14,8 @@
 #   --working <n>     how many of them hold an item now: sends capacity {working, cap: --workers}
 #   --item <P-n>      the item you are on       --chat <id>     the chat (with state chatting)
 #   --role <role>     default D2_ROLE, the token file's D2_ROLE, or your agent name without -<n>
+#   --step <text>     what you are doing right now (a chat join sends --step interactive)
+#   --started-by <x>  who started you (an agent's name, or app-chat / prompt when your person did)
 #   --dry             print the body instead of sending it
 #
 # Posts POST /api/v2/cmd/Agent/status through d2.sh; same output and exit codes as d2.sh.
@@ -25,24 +27,25 @@ here=$(cd "$(dirname "$0")" && pwd)
 
 usage() {
   echo 'usage: status.sh [--dry] [--tokens n [--window n] | --context n] [--every s] [--workers n] [--working n]' >&2
-  echo '                 [--item P-n] [--chat id] [--role r] <state> "<text>"' >&2
+  echo '                 [--item P-n] [--chat id] [--step s] [--started-by x] [--role r] <state> "<text>"' >&2
   echo '       status.sh --first [same options] ["<text>"]' >&2
   exit 2
 }
 num() { case "$2" in ''|*[!0-9]*) echo "status.sh: $1 must be a whole number" >&2; exit 2 ;; esac; }
 
 dry=""; first=""; tokens=""; window=${D2_WINDOW:-}; context=""; every=900
-workers=${D2_WORKERS:-}; working=""; item=""; chat=""; role=${D2_ROLE:-}
+workers=${D2_WORKERS:-}; working=""; item=""; chat=""; step=""; startedby=""; role=${D2_ROLE:-}
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry) dry=1; shift ;;
     --first) first=1; shift ;;
-    --tokens|--window|--context|--every|--workers|--working|--item|--chat|--role)
+    --tokens|--window|--context|--every|--workers|--working|--item|--chat|--role|--step|--started-by)
       [ $# -ge 2 ] || usage
       case "$1" in
         --tokens) tokens=$2 ;; --window) window=$2 ;; --context) context=$2 ;;
         --every) every=$2 ;; --workers) workers=$2 ;; --working) working=$2 ;;
         --item) item=$2 ;; --chat) chat=$2 ;; --role) role=$2 ;;
+        --step) step=$2 ;; --started-by) startedby=$2 ;;
       esac
       shift 2 ;;
     --) shift; break ;;
@@ -84,7 +87,7 @@ tmp=$(d2_tmp)
 trap 'rm -rf "$tmp"' EXIT
 AGENT="$agent" ROLE="$role" STATE="$state" TEXT="$text" EVERY="$every" FIRST="$first" \
 TOKENS="$tokens" WINDOW="$window" CONTEXT="$context" WORKERS="$workers" WORKING="$working" \
-ITEM="$item" CHAT="$chat" HARNESS="${D2_HARNESS:-claude-code}" python3 -c '
+ITEM="$item" CHAT="$chat" STEP="$step" STARTEDBY="$startedby" HARNESS="${D2_HARNESS:-claude-code}" python3 -c '
 import json, os
 e = os.environ
 b = {"agent": e["AGENT"], "role": e["ROLE"], "state": e["STATE"], "every": int(e["EVERY"]), "text": e["TEXT"]}
@@ -99,6 +102,8 @@ if e["WORKING"]:
     b["capacity"] = {"working": int(e["WORKING"]), "cap": int(e["WORKERS"])}
 if e["ITEM"]: b["item"] = e["ITEM"]
 if e["CHAT"]: b["chat"] = e["CHAT"]
+if e["STEP"]: b["step"] = e["STEP"]
+if e["STARTEDBY"]: b["startedBy"] = e["STARTEDBY"]
 print(json.dumps(b))' > "$tmp/body"
 
 if [ -n "$dry" ]; then

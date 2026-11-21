@@ -6,16 +6,17 @@
 #   d2.sh GET  "/api/v2/skills/d3?role=builder"
 #   d2.sh POST /api/v2/cmd/Agent/status body.json
 #   common/json.sh state=idle | d2.sh POST /api/v2/some/path -
-#   d2.sh --type text/markdown PUT "/api/v2/drafts/Page:X?why=fix+typo" page.md
+#   d2.sh --type text/markdown --header 'If-Match: "d3"' PUT "/api/v2/drafts/Page:X?why=fix+typo" page.md
 #
+# --header adds one request header (repeatable; never Authorization, which d2.sh sends itself).
 # Where:  D2_URL (e.g. https://aiputty.com), or D2_PROJECT -> https://$D2_PROJECT.aiputty.com.
 # Who:    D2_AGENT (your agent name, sent as D2-Agent).
 # Token:  D2_TOKEN_FILE (a mode-600 file, e.g. one mint.sh wrote), or D2_TOKEN (or D2_AGENT_TOKEN)
 #         in the environment, or else ${D2_HOME:-~/.d2}/tokens/$D2_AGENT.env.
 # --dry:  print the method, URL and body instead of sending; needs no token.
 #
-# Prints the response body on stdout and "HTTP <status>" on stderr.
-# Exit: 0 on 2xx, 1 on any other status, 2 usage, 3 no usable token, 4 network error.
+# Prints the response body on stdout and "HTTP <status>" on stderr, with "ETag <tag>" when d2 sends one.
+# Exit: 0 on 2xx (and 304 Not Modified), 1 on any other status, 2 usage, 3 no usable token, 4 network error.
 # The token is never printed and never put on a command line.
 set -eu
 
@@ -23,12 +24,18 @@ here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-usage() { echo "usage: d2.sh [--dry] [--type <content-type>] METHOD /api/v2/path [body-file|-]" >&2; exit 2; }
-dry=""; ctype=application/json
+usage() { echo "usage: d2.sh [--dry] [--type <content-type>] [--header 'Name: value']... METHOD /api/v2/path [body-file|-]" >&2; exit 2; }
+dry=""; ctype=application/json; headers=""
+nl='
+'
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry) dry=1; shift ;;
     --type) [ $# -ge 2 ] || usage; ctype=$2; shift 2 ;;
+    --header)
+      [ $# -ge 2 ] || usage
+      case "$2" in *"$nl"*|*'\'*|[Aa]uthorization:*) echo "d2.sh: --header can't hold a newline, a backslash or Authorization" >&2; exit 2 ;; esac
+      headers="$headers$2$nl"; shift 2 ;;
     --) shift; break ;;
     -*) usage ;;
     *) break ;;
@@ -51,6 +58,7 @@ fi
 
 if [ -n "$dry" ]; then
   echo "DRY $method $url"
+  [ -z "$headers" ] || printf '%s' "$headers"
   [ -z "$body" ] || { cat "$body"; echo; }
   exit 0
 fi
@@ -75,14 +83,18 @@ fi
 
 d2_curl_cfg "$tmp/cfg" "$token" "$agent" "$ctype"
 unset token
+printf '%s' "$headers" | while IFS= read -r h; do
+  [ -z "$h" ] || printf 'header = "%s"\n' "$(printf '%s' "$h" | sed 's/"/\\"/g')" >> "$tmp/cfg"
+done
 
 if [ -n "$body" ]; then
-  code=$(curl -sS --max-time 60 -K "$tmp/cfg" -X "$method" -o "$tmp/out" -w '%{http_code}' \
+  code=$(curl -sS --max-time 60 -K "$tmp/cfg" -X "$method" -D "$tmp/hdr" -o "$tmp/out" -w '%{http_code}' \
     --data-binary "@$body" "$url") || { echo "d2.sh: network error calling $url" >&2; exit 4; }
 else
-  code=$(curl -sS --max-time 60 -K "$tmp/cfg" -X "$method" -o "$tmp/out" -w '%{http_code}' \
+  code=$(curl -sS --max-time 60 -K "$tmp/cfg" -X "$method" -D "$tmp/hdr" -o "$tmp/out" -w '%{http_code}' \
     "$url") || { echo "d2.sh: network error calling $url" >&2; exit 4; }
 fi
-cat "$tmp/out"
-echo "HTTP $code" >&2
-case "$code" in 2??) exit 0 ;; *) exit 1 ;; esac
+[ ! -f "$tmp/out" ] || cat "$tmp/out"
+etag=$(tr -d '\r' < "$tmp/hdr" | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p' | tail -1)
+if [ -n "$etag" ]; then echo "HTTP $code ETag $etag" >&2; else echo "HTTP $code" >&2; fi
+case "$code" in 2??|304) exit 0 ;; *) exit 1 ;; esac
