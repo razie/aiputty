@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "d2": {
+      "type": "http",
+      "url": "${D2_URL:-https://aiputty.com}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${D2_TOKEN}",
+        "D2-Agent": "${D2_AGENT}"
+      }
+    }
+  }
+}

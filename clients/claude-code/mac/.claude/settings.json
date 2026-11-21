@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(common/d2.sh *)",
+      "Bash(./common/d2.sh *)",
+      "Bash(common/mint.sh *)",
+      "Bash(./common/mint.sh *)",
+      "Bash(common/status.sh *)",
+      "Bash(./common/status.sh *)",
+      "Bash(common/heartbeat.sh *)",
+      "Bash(./common/heartbeat.sh *)",
+      "Bash(common/say.sh *)",
+      "Bash(./common/say.sh *)",
+      "Bash(common/note.sh *)",
+      "Bash(./common/note.sh *)",
+      "Bash(common/file.sh *)",
+      "Bash(./common/file.sh *)",
+      "Bash(common/json.sh *)",
+      "Bash(./common/json.sh *)",
+      "Bash(clients/claude-code/mac/check.sh)",
+      "WebFetch(domain:aiputty.com)",
+      "WebFetch(domain:*.aiputty.com)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "d2"
+  ]
+}
