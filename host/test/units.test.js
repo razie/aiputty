@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { formatEntry, entriesOf, entryKey } from '../lib/seat.js';
-import { scrub, addSecret } from '../lib/log.js';
+import { scrub, addSecret, isTokenish, makeLog } from '../lib/log.js';
 import { readTokenFile, loadConfig, ConfigError } from '../lib/config.js';
 import { userLine } from '../lib/pass.js';
 
@@ -24,6 +24,24 @@ test('scrub removes known secrets and anything token-shaped', () => {
   assert.equal(scrub(`Bearer ${t} ok`), 'Bearer <token> ok');
   addSecret('plain-secret-value');
   assert.equal(scrub('a plain-secret-value b'), 'a <token> b');
+});
+
+test('a log write never throws: its folder gone, the line is lost and the host goes on', () => {
+  const d = tmp();
+  const log = makeLog(path.join(d, 'logs', 'a.log'));
+  log('kept');
+  assert.match(fs.readFileSync(path.join(d, 'logs', 'a.log'), 'utf8'), /kept/);
+  fs.rmSync(d, { recursive: true, force: true });
+  assert.doesNotThrow(() => log('lost'));
+  assert.doesNotThrow(() => log.raw(path.join(d, 'logs', 'a.stream.jsonl'), 'lost\n'));
+  assert.equal(fs.existsSync(d), false, 'nothing made again');
+});
+
+test('a token in a value is spotted, so no env var carries one to the agent', () => {
+  assert.equal(isTokenish(['d2t', 'abc123'].join('_')), true);
+  addSecret('another-plain-secret');
+  assert.equal(isTokenish('x another-plain-secret'), true);
+  assert.equal(isTokenish('/usr/bin:/bin'), false);
 });
 
 test('stream-json user line', () => {

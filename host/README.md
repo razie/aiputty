@@ -25,7 +25,9 @@ For each seat (today: one designer), forever:
 - **Revoked token** (401/403): the seat stops and says so in its log.
 - **Tokens** stay in their mode-600 files and the host's memory: sent only as a request header, never on a
   command line, never logged (every log line is scrubbed). The agent gets the token file's *path*
-  (`D2_TOKEN_FILE`, as `common/d2.sh` reads it), never the value in its environment.
+  (`D2_TOKEN_FILE`, as `common/d2.sh` reads it), never the value in its environment: the host drops the
+  D2_ token vars and any other var holding a token (a role token the person exported) from the agent's env.
+  A log line that can't be written is lost; it never stops the host.
 - Agents run as on the person's own Mac: `--permission-mode acceptEdits` with Bash, Read, Edit, Write
   (DesignMacHost section 6: this is not a fence).
 

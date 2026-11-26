@@ -21,20 +21,27 @@ export function scrub(text) {
   return s.replace(SHAPE, '<token>');
 }
 
+/** Whether the text holds a known secret or anything token-shaped. */
+export function isTokenish(text) {
+  const s = String(text);
+  for (const v of known) if (s.includes(v)) return true;
+  return s.includes(PREFIX);
+}
+
 /** A logger writing scrubbed lines to `file` (mode 600) and, when `echo`, to stderr. */
 export function makeLog(file, { echo = false } = {}) {
+  // A log write never throws: a full disk or a removed folder must not crash the host (an unhandled
+  // rejection from a status call nobody awaits ends a Node 24 process).
   if (file) fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  const append = (f, text) => {
+    try { fs.appendFileSync(f, text, { mode: 0o600 }); } catch { /* the line is lost, the host goes on */ }
+  };
   const write = (line) => {
     const out = scrub(line) + '\n';
-    if (file) {
-      fs.appendFileSync(file, out, { mode: 0o600 });
-    }
+    if (file) append(file, out);
     if (echo) process.stderr.write(out);
   };
   const log = (...parts) => write(`${new Date().toISOString()} ${parts.join(' ')}`);
-  log.raw = (file2, text) => {
-    fs.mkdirSync(path.dirname(file2), { recursive: true, mode: 0o700 });
-    fs.appendFileSync(file2, scrub(text), { mode: 0o600 });
-  };
+  log.raw = (file2, text) => append(file2, scrub(text));
   return log;
 }

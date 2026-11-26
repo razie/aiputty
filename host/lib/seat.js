@@ -15,7 +15,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { D2 } from './d2.js';
 import { Pass } from './pass.js';
-import { addSecret, makeLog } from './log.js';
+import { addSecret, isTokenish, makeLog } from './log.js';
 
 export const TIMING = Object.freeze({
   heartbeatMs: 60_000,      // status every 60 s
@@ -128,7 +128,8 @@ export class Seat {
 
   agentEnv() {
     const env = { ...process.env };
-    for (const k of STRIP_ENV) delete env[k];
+    // the named token vars, and any other var holding a token (a role token in the host's own env)
+    for (const k of Object.keys(env)) if (STRIP_ENV.includes(k) || isTokenish(env[k])) delete env[k];
     env.D2_AGENT = this.agent;
     env.D2_TOKEN_FILE = this.tokenFile;
     env.D2_URL = this.url;

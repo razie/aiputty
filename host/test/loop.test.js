@@ -9,8 +9,13 @@ import { tempHome, until, pause, alive, allText, LOOP } from '../testkit/env.js'
 
 const PREFIX = ['d2t', ''].join('_');
 
+// a role token in the host's own environment (as on a Mac where the person exported one): never the agent's
+const ROLE_TOKEN = [PREFIX.slice(0, -1), 'fakeroleintheenv', 'q1w2e3r4'].join('_');
+
 function host(config) {
-  const child = spawn(process.execPath, [LOOP, '--config', config], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const child = spawn(process.execPath, [LOOP, '--config', config], {
+    stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, D2_SOME_ROLE: ROLE_TOKEN },
+  });
   let err = '';
   child.stderr.on('data', (c) => { err += c; });
   child.exited = new Promise((r) => child.on('exit', (code, signal) => r({ code, signal, err })));
@@ -41,6 +46,9 @@ test('kill -9 mid-pass: the message is answered once, and the host carries on af
     assert.ok(!ps.includes(fake.token), 'no token in ps (command lines and environments)');
     assert.ok(!ps.includes(PREFIX + 'fakehost'), 'nothing token-shaped in ps');
     assert.ok(ps.includes('stubagent.js'), 'the stand-in agent shows in ps');
+    const agentPs = execFileSync('ps', ['-Eww', '-o', 'command=', '-p', String(agentPid)], { encoding: 'utf8' });
+    assert.match(agentPs, /D2_TOKEN_FILE=/, 'ps -E shows the agent\'s environment');
+    assert.ok(!agentPs.includes(ROLE_TOKEN) && !agentPs.includes(PREFIX), 'no token in the agent\'s environment');
 
     process.kill(h1.pid, 'SIGKILL');
     await h1.exited;
