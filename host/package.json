@@ -1,0 +1,13 @@
+{
+  "name": "aiputty-host",
+  "private": true,
+  "type": "module",
+  "description": "The d2 agent host: one loop per seat, no packages (Node 24).",
+  "main": "all-tests.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
